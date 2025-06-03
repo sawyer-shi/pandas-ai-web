@@ -253,7 +253,6 @@ pandas-ai-web/
 ├── start_app.py             # 本地启动脚本（不创建共享链接）
 ├── requirements.txt         # 项目依赖
 ├── README.md                # 项目说明（本文件）
-├── 使用指南.md               # 中文使用指南
 ├── env.example              # 环境变量配置示例
 ├── .gitignore               # Git忽略文件配置
 ├── src/                     # 源代码目录
@@ -538,7 +537,6 @@ pandas-ai-web/
 ├── start_app.py             # Local startup script (no shared links)
 ├── requirements.txt         # Dependencies
 ├── README.md                # Project documentation (this file)
-├── 使用指南.md               # Chinese user guide
 ├── env.example              # Environment variable configuration example
 ├── .gitignore               # Git ignore file configuration
 ├── src/                     # Source code directory
