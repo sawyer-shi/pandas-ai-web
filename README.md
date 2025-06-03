@@ -8,6 +8,10 @@
 
 Pandas AI Web 是一个基于PandasAI和Gradio开发的数据对话应用，让您能够通过自然语言与您的数据进行交互。只需上传CSV或Excel文件，选择AI模型，然后用自然语言提问，即可获得数据洞察和可视化结果。
 
+### Screenshots
+![QQ20250603-162827](https://github.com/user-attachments/assets/2763455f-fba7-417a-a03c-1a16b9b27502)
+![QQ20250603-170735](https://github.com/user-attachments/assets/a776e2dc-5ec7-4679-8ca4-930c078849d1)
+
 ### 特点
 
 - 支持中英文双语界面
@@ -289,6 +293,10 @@ pandas-ai-web/
 
 Pandas AI Web is a data conversation application developed based on PandasAI and Gradio, allowing you to interact with your data using natural language. Simply upload a CSV or Excel file, select an AI model, and ask questions in natural language to get data insights and visualizations.
 
+### Screenshots
+![QQ20250603-162827](https://github.com/user-attachments/assets/2763455f-fba7-417a-a03c-1a16b9b27502)
+![QQ20250603-170735](https://github.com/user-attachments/assets/a776e2dc-5ec7-4679-8ca4-930c078849d1)
+
 ### Features
 
 - Bilingual interface (Chinese and English)
@@ -564,9 +572,6 @@ pandas-ai-web/
 └── chat_history.db          # SQLite database (automatically created)
 ```
 
-## Contributors
-
-- [Your Name](https://github.com/yourusername) - Original author and maintainer
 
 ## License
 
