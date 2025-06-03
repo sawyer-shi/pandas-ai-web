@@ -1,0 +1,109 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Logs and debug files
+*.log
+logs/
+pandasai.log
+app_debug.log
+debug.log
+
+# Database files (keep empty database structure, ignore data)
+chat_history.db
+*.sqlite
+*.sqlite3
+*.db
+
+# Cached files
+.cache/
+cache/
+.gradio/
+.gradio_cached_examples/
+
+# Generated charts and temp files
+charts/*.png
+charts/*.jpg
+charts/*.jpeg
+charts/*.svg
+exports/
+*.tmp
+temp/
+tmp/
+
+# Test files
+test_*.png
+test_*.jpg
+test_*.jpeg
+test_*.py
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# OS specific files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Distribution and packaging
+dist/
+build/
+*.egg-info/
+
+# Node modules (if any)
+node_modules/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Configuration files that might contain secrets
+config/*.ini
+!config/config.ini.example 

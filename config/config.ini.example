@@ -1,0 +1,22 @@
+[common]
+# 阿里云OSS配置示例 (Alibaba Cloud OSS Configuration Example)
+# 如果不使用OSS，请保持enabled=false (If not using OSS, keep enabled=false)
+enabled = false
+
+# 访问密钥ID (Access Key ID)
+access_key_id = your-access-key-id
+
+# 访问密钥Secret (Access Key Secret)  
+access_key_secret = your-access-key-secret
+
+# OSS存储桶名称 (OSS Bucket Name)
+bucket = your-bucket-name
+
+# 存储目录 (Storage Directory)
+directory = chartlist
+
+# OSS节点 (OSS Endpoint)
+endpoint = oss-cn-hangzhou.aliyuncs.com
+
+# 可选：自定义域名 (Optional: Custom Domain)
+# custom_domain = your-custom-domain.com 
