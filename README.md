@@ -29,127 +29,127 @@ Pandas AI Web 是一个基于PandasAI和Gradio开发的数据对话应用，让�
 
 ### 安装与配置
 
-#### Method 1: Direct Source Code Installation
+#### 方式一：直接源码安装
 
-1. Clone the repository:
+1. 克隆仓库：
    ```bash
-   git clone https://github.com/yourusername/pandas-ai-web.git
+   git clone https://github.com/sawyer-shi/pandas-ai-web.git
    cd pandas-ai-web
    ```
 
-2. Install dependencies:
+2. 安装依赖：
    ```bash
    pip install -r requirements.txt
    ```
 
-3. Create and configure the `.env` file:
+3. 创建并配置 `.env` 文件：
    ```bash
-   # OpenAI configuration
+   # OpenAI配置
    OPENAI_API_KEY=your_openai_key
 
-   # Or Azure OpenAI configuration
+   # 或者 Azure OpenAI配置
    AZURE_OPENAI_API_KEY=your_azure_key
    AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
    AZURE_OPENAI_DEPLOYMENT_NAME=your_deployment_name
    AZURE_OPENAI_API_VERSION=2023-05-15
 
-   # Or Ollama configuration
+   # 或者 Ollama配置
    OLLAMA_MODEL=llama3
    OLLAMA_BASE_URL=http://localhost:11434
    
-   # Default AI model type (OpenAI, Azure, Ollama)
+   # 默认AI模型类型 (OpenAI, Azure, Ollama)
    DEFAULT_LLM_TYPE=Azure
    ```
 
-4. Start the application:
+4. 启动应用：
    ```bash
    python main.py
    ```
 
-#### Method 2: Python venv Virtual Environment Installation
+#### 方式二：Python venv虚拟环境安装
 
-1. Clone the repository:
+1. 克隆仓库：
    ```bash
-   git clone https://github.com/yourusername/pandas-ai-web.git
+   git clone https://github.com/sawyer-shi/pandas-ai-web.git
    cd pandas-ai-web
    ```
 
-2. Create a virtual environment:
+2. 创建虚拟环境：
    ```bash
-   # Create a virtual environment
+   # 创建虚拟环境
    python -m venv .venv
    
-   # Activate the virtual environment
+   # 激活虚拟环境
    # Windows:
    .venv\Scripts\activate
    # macOS/Linux:
    source .venv/bin/activate
    ```
 
-3. Install dependencies:
+3. 安装依赖：
    ```bash
    pip install --upgrade pip
    pip install -r requirements.txt
    ```
 
-4. Create and configure the `.env` file (same as method one)
+4. 创建并配置 `.env` 文件（同方式一）
 
-5. Start the application:
+5. 启动应用：
    ```bash
    python main.py
    ```
 
-6. Exit the virtual environment:
+6. 退出虚拟环境：
    ```bash
    deactivate
    ```
 
-#### Method 3: Conda Environment Installation
+#### 方式三：Conda环境安装
 
-1. Clone the repository:
+1. 克隆仓库：
    ```bash
-   git clone https://github.com/yourusername/pandas-ai-web.git
+   git clone https://github.com/sawyer-shi/pandas-ai-web.git
    cd pandas-ai-web
    ```
 
-2. Create a Conda environment:
+2. 创建Conda环境：
    ```bash
-   # Create a new Conda environment
+   # 创建新的Conda环境
    conda create -n pandas-ai-web python=3.9
    
-   # Activate the environment
+   # 激活环境
    conda activate pandas-ai-web
    ```
 
-3. Install dependencies:
+3. 安装依赖：
    ```bash
-   # Upgrade pip
+   # 升级pip
    pip install --upgrade pip
    
-   # Install project dependencies
+   # 安装项目依赖
    pip install -r requirements.txt
    
-   # Or use conda to install common packages and then install remaining dependencies
+   # 或者使用conda安装常用包，然后安装剩余依赖
    conda install pandas numpy matplotlib sqlite
    pip install -r requirements.txt
    ```
 
-4. Create and configure the `.env` file (same as method one)
+4. 创建并配置 `.env` 文件（同方式一）
 
-5. Start the application:
+5. 启动应用：
    ```bash
    python main.py
    ```
 
-6. Exit the Conda environment:
+6. 退出Conda环境：
    ```bash
    conda deactivate
    ```
 
-#### OSS Configuration (Optional)
+#### OSS配置（可选）
 
-Configure Alibaba Cloud OSS for chart storage and sharing:
-Edit the `config/config.ini` file:
+配置阿里云OSS用于图表存储和分享：
+编辑 `config/config.ini` 文件：
 ```ini
 [common]
 access_key_id = your-access-key-id
@@ -159,18 +159,18 @@ directory = chartlist
 endpoint = oss-cn-hangzhou.aliyuncs.com
 ```
 
-#### Environment Requirements
+#### 环境要求
 
-- **Python version**: 3.8+ (recommended 3.9 or 3.10)
-- **Operating system**: Windows 10+, macOS 10.14+, Ubuntu 18.04+
-- **Memory**: At least 4GB RAM (recommended 8GB+)
-- **Storage**: At least 1GB available space
-- **Network**: Stable internet connection (for AI model API calls)
+- **Python版本**: 3.8+ (推荐 3.9 或 3.10)
+- **操作系统**: Windows 10+, macOS 10.14+, Ubuntu 18.04+
+- **内存**: 至少 4GB RAM (推荐 8GB+)
+- **存储**: 至少 1GB 可用空间
+- **网络**: 稳定的网络连接 (用于AI模型API调用)
 
-#### Optional Components
+#### 可选组件
 
-- **Ollama**: Local AI model support, requires separate Ollama service installation
-- **Chinese fonts**: Windows users usually have them pre-installed, Linux users may need to install Chinese font packages
+- **Ollama**: 本地AI模型支持，需要单独安装Ollama服务
+- **中文字体**: Windows用户通常已预装，Linux用户可能需要安装中文字体包
 
 ### 快速开始
 
