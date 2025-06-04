@@ -83,10 +83,22 @@ class DataLoader:
         
         # 创建完整的HTML表格预览，带有行数统计信息
         if row_count <= max_display_rows:
-            preview_html = f"<div style='margin-bottom:10px;'>{LanguageUtils.get_text(language, 'total_rows', row_count)}</div>"
-            preview_html += dataframe.to_html(index=True, max_rows=None)
+            info_text = LanguageUtils.get_text(language, 'total_rows', row_count)
+            table_html = dataframe.to_html(index=True, max_rows=None, table_id="data-preview-table", 
+                                         escape=False, classes="table table-striped")
         else:
-            preview_html = f"<div style='margin-bottom:10px;'>{LanguageUtils.get_text(language, 'total_rows_limit', row_count, max_display_rows)}</div>"
-            preview_html += dataframe.head(max_display_rows).to_html(index=True)
+            info_text = LanguageUtils.get_text(language, 'total_rows_limit', row_count, max_display_rows)
+            table_html = dataframe.head(max_display_rows).to_html(index=True, table_id="data-preview-table",
+                                                                escape=False, classes="table table-striped")
+        
+        # 包装在一个带有样式的div中
+        preview_html = f"""
+        <div style='margin-bottom:10px; padding:5px; background:#e8f4fd; border-radius:4px; font-size:0.9em; color:#333;'>
+            <strong>{info_text}</strong>
+        </div>
+        <div style='overflow:auto; max-height:500px;'>
+            {table_html}
+        </div>
+        """
             
         return preview_html 

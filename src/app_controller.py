@@ -144,13 +144,36 @@ class AppController:
                 os.path.basename(file)
             )
             
-            # 保存数据框
+            # 完全重置所有相关状态
+            self.df = None  # 先清空旧数据
+            self.agent = None  # 清空旧的Agent
+            self.chat_history = []  # 重置聊天记录
+            
+            # 清理旧的图表缓存（如果有的话）
+            try:
+                # 清理charts目录中过期的图表文件（保留最近1小时的）
+                import glob
+                import time
+                chart_files = glob.glob("charts/*.png")
+                current_time = time.time()
+                for chart_file in chart_files:
+                    file_time = os.path.getmtime(chart_file)
+                    # 如果文件超过1小时，删除它
+                    if current_time - file_time > 3600:  # 3600秒 = 1小时
+                        try:
+                            os.remove(chart_file)
+                            print(f"清理旧图表文件: {chart_file}")
+                        except:
+                            pass
+            except Exception as e:
+                print(f"清理旧图表时出错: {e}")
+            
+            # 设置新数据
             self.df = dataframe
+            print(f"✅ 新数据已加载: {len(self.df)} 行 x {len(self.df.columns)} 列")
+            print(f"📊 数据列名: {list(self.df.columns)}")
             
-            # 重置聊天记录，以便开始新的会话
-            self.chat_history = []
-            
-            # 初始化AI处理器
+            # 初始化AI处理器 - 这会创建新的Agent
             init_result, success = self.initialize_ai(self.llm_type)
             if not success:
                 return f"{self.get_text('load_error')}: {init_result}", None
@@ -162,9 +185,11 @@ class AppController:
             model_name = self.get_model_name()
             result_message = f"{message}，并初始化{self.llm_type} ({model_name})模型"
             
+            print(f"✅ 数据加载完成: {result_message}")
             return result_message, preview_html
             
         except Exception as e:
+            print(f"❌ 数据加载失败: {str(e)}")
             return self.get_text("load_error", str(e)), None
     
     def initialize_ai(self, llm_type):
@@ -175,6 +200,10 @@ class AppController:
             # 首先检查是否已上传数据
             if self.df is None:
                 return self.get_text("no_dataframe"), False
+            
+            # 强制清除旧的Agent实例
+            self.agent = None
+            print(f"🔄 正在初始化 {llm_type} 模型...")
                 
             # 创建LLM实例
             llm, success, error_msg = LLMFactory.create_llm(llm_type, self.language)
@@ -184,6 +213,7 @@ class AppController:
                 
             # 生成数据描述，包含列名信息
             data_description = self._generate_data_description()
+            print(f"📋 数据描述已生成，包含 {len(self.df.columns)} 个列")
             
             # 配置PandasAI
             config = {
@@ -198,11 +228,20 @@ class AppController:
                 "custom_plot_kwargs": get_chinese_plot_kwargs()
             }
             
-            # 创建Agent实例
+            # 创建全新的Agent实例
+            print(f"🤖 正在创建新的 Agent 实例...")
             self.agent = Agent(self.df, config=config, description=data_description)
             
+            # 验证Agent是否正确初始化
+            if self.agent is None:
+                return self.get_text("init_failed", "Agent creation failed"), False
+            
+            print(f"✅ {llm_type} 模型初始化成功，Agent 已就绪")
             return self.get_text("init_success", llm_type), True
+            
         except Exception as e:
+            error_msg = f"初始化失败: {str(e)}"
+            print(f"❌ {error_msg}")
             return self.get_text("init_failed", str(e)), False
     
     def _generate_data_description(self):

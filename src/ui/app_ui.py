@@ -56,6 +56,74 @@ class AppUI:
                 background-color: rgba(255,255,255,0.9) !important;
             }
             
+            /* 数据预览区域样式 */
+            .data-preview-container {
+                max-height: 500px !important;
+                overflow-y: auto !important;
+                overflow-x: auto !important;
+                border: 1px solid #e0e0e0 !important;
+                border-radius: 6px !important;
+                padding: 10px !important;
+                background: #fafafa !important;
+                margin-top: 10px !important;
+            }
+            
+            .data-preview-container table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                font-size: 0.85em !important;
+                margin: 0 !important;
+            }
+            
+            .data-preview-container th {
+                background: #f8f9fa !important;
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 10 !important;
+                padding: 8px 6px !important;
+                border: 1px solid #dee2e6 !important;
+                font-size: 0.8em !important;
+                font-weight: 600 !important;
+                text-align: left !important;
+                white-space: nowrap !important;
+            }
+            
+            .data-preview-container td {
+                padding: 6px !important;
+                border: 1px solid #dee2e6 !important;
+                font-size: 0.75em !important;
+                white-space: nowrap !important;
+                text-align: left !important;
+            }
+            
+            .data-preview-container tr:nth-child(even) {
+                background-color: #f9f9f9 !important;
+            }
+            
+            .data-preview-container tr:hover {
+                background-color: #e8f4fd !important;
+            }
+            
+            /* 滚动条样式美化 */
+            .data-preview-container::-webkit-scrollbar {
+                width: 8px !important;
+                height: 8px !important;
+            }
+            
+            .data-preview-container::-webkit-scrollbar-track {
+                background: #f1f1f1 !important;
+                border-radius: 4px !important;
+            }
+            
+            .data-preview-container::-webkit-scrollbar-thumb {
+                background: #c1c1c1 !important;
+                border-radius: 4px !important;
+            }
+            
+            .data-preview-container::-webkit-scrollbar-thumb:hover {
+                background: #a8a8a8 !important;
+            }
+            
             .tip-text {
                 color: #666;
                 font-size: 0.9em;
@@ -245,7 +313,10 @@ class AppUI:
                             label=self.get_text("upload_status"), 
                             value=self.get_text("waiting_upload")
                         )
-                        data_preview = gr.HTML(label=self.get_text("data_preview"))
+                        data_preview = gr.HTML(
+                            label=self.get_text("data_preview"),
+                            elem_classes="data-preview-container"
+                        )
                 
                 with gr.Column(scale=2):
                     # 右侧：聊天界面
@@ -431,7 +502,17 @@ class AppUI:
                     file_input.upload(
                         fn=self.controller.load_dataframe,
                         inputs=[file_input],
-                        outputs=[upload_status, data_preview],
+                        outputs=[upload_status, data_preview]
+                    ).then(
+                        # 上传新文件后清除聊天记录和图表显示
+                        fn=lambda: ([], None, self.get_text("no_chart")),
+                        inputs=[],
+                        outputs=[chatbot, chart_display, chart_info]
+                    ).then(
+                        # 刷新历史记录显示
+                        fn=self.controller.refresh_current_history,
+                        inputs=[],
+                        outputs=[chat_history_display]
                     )
                 return None
             
@@ -702,6 +783,16 @@ class AppUI:
                 fn=self.controller.load_dataframe,
                 inputs=[file_input],
                 outputs=[upload_status, data_preview]
+            ).then(
+                # 上传新文件后清除聊天记录和图表显示
+                fn=lambda: ([], None, self.get_text("no_chart")),
+                inputs=[],
+                outputs=[chatbot, chart_display, chart_info]
+            ).then(
+                # 刷新历史记录显示
+                fn=self.controller.refresh_current_history,
+                inputs=[],
+                outputs=[chat_history_display]
             )
             
         return interface 
