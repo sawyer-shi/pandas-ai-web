@@ -266,4 +266,44 @@ def configure_chinese_fonts():
 
 def get_chinese_plot_kwargs():
     """获取中文绘图参数的便捷函数"""
-    return font_manager.get_plot_kwargs() 
+    return font_manager.get_plot_kwargs()
+
+def force_chinese_font_config():
+    """强制配置中文字体，用于PandasAI图表生成前"""
+    try:
+        import matplotlib.pyplot as plt
+        from matplotlib import rcParams
+        
+        # 获取最佳中文字体
+        chinese_font = font_manager._get_best_chinese_font()
+        
+        if chinese_font:
+            # 强制设置matplotlib全局配置
+            plt.rcParams['font.sans-serif'] = [chinese_font, 'DejaVu Sans', 'Liberation Sans', 'sans-serif']
+            plt.rcParams['font.family'] = 'sans-serif'
+            plt.rcParams['axes.unicode_minus'] = False
+            
+            # 同时更新rcParams
+            rcParams['font.sans-serif'] = [chinese_font, 'DejaVu Sans', 'Liberation Sans', 'sans-serif'] 
+            rcParams['font.family'] = 'sans-serif'
+            rcParams['axes.unicode_minus'] = False
+            
+            print(f"🔤 强制设置中文字体: {chinese_font}")
+            return True
+        else:
+            print("⚠ 未找到中文字体，使用默认配置")
+            return False
+    except Exception as e:
+        print(f"⚠ 强制配置中文字体失败: {e}")
+        return False
+
+def ensure_chinese_font_for_pandasai():
+    """为PandasAI确保中文字体配置"""
+    # 1. 重新配置matplotlib
+    configure_chinese_fonts()
+    
+    # 2. 强制应用字体配置
+    force_chinese_font_config()
+    
+    # 3. 返回plot_kwargs供PandasAI使用
+    return get_chinese_plot_kwargs() 

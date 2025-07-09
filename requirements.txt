@@ -1,29 +1,29 @@
 # Core web framework
-gradio>=4.44.0,<5.0.0
+gradio>=4.0.0
 
 # Data analysis and AI
-pandasai>=2.2.0,<3.0.0
+pandasai>=2.0.0
 pandas==1.5.3
-numpy>=1.24.3,<2.0.0
+numpy==1.24.3
 
 # Visualization and plotting
-matplotlib>=3.7.0,<4.0.0
+matplotlib>=3.7.0
 
 # Excel file support
-openpyxl>=3.1.0,<4.0.0
-xlrd>=2.0.1,<3.0.0
+openpyxl>=3.1.0
+xlrd>=2.0.1
 
 # AI model APIs
-openai>=1.30.0,<2.0.0
+openai>=1.0.0
 
 # Environment and configuration
-python-dotenv>=1.0.0,<2.0.0
+python-dotenv>=1.0.0
 
 # Local AI models
-ollama>=0.1.7,<1.0.0
+ollama>=0.1.0
 
 # Cloud storage
-oss2>=2.19.0,<3.0.0
+oss2>=2.18.0
 
 # HTTP requests
-requests>=2.31.0,<3.0.0
+requests>=2.31.0

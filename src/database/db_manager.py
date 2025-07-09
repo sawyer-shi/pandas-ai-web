@@ -3,11 +3,12 @@ import sqlite3
 import uuid
 import re
 from datetime import datetime
+from src.utils.language_utils import LanguageUtils
 
 class DBManager:
     """数据库管理类，负责管理聊天历史和会话记录"""
     
-    def __init__(self, db_path="chat_history.db"):
+    def __init__(self, db_path="data/chat_history.db"):
         """
         初始化数据库管理器
         
@@ -24,6 +25,18 @@ class DBManager:
         Returns:
             sqlite3.Connection: 数据库连接对象
         """
+        # 确保数据库文件所在的目录存在
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+            print(f"已创建数据目录: {db_dir}")
+            
+        # 如果数据库路径是一个目录，删除它
+        if os.path.isdir(self.db_path):
+            print(f"警告: {self.db_path} 是一个目录，将被删除")
+            import shutil
+            shutil.rmtree(self.db_path)
+            
         return sqlite3.connect(self.db_path)
     
     def _init_database(self):
@@ -157,7 +170,8 @@ class DBManager:
         try:
             # 如果直接传入了图表路径，使用它
             has_chart = bool(chart_path and os.path.exists(chart_path))
-            final_chart_path = os.path.abspath(chart_path) if has_chart else None
+            # 使用相对路径存储，而不是绝对路径
+            final_chart_path = os.path.relpath(chart_path) if has_chart else None
             
             # 如果没有直接传入图表路径，尝试从回答文本中检测
             if not has_chart:
@@ -177,8 +191,8 @@ class DBManager:
                     path_matches = re.findall(r'本地图片路径:\s+(.+?)(?:\n|$)', answer)
                     if path_matches:
                         original_path = path_matches[0].strip()
-                        # 转换为绝对路径
-                        img_path = os.path.abspath(original_path) if not os.path.isabs(original_path) else original_path
+                        # 转换为相对路径
+                        img_path = os.path.relpath(original_path) if os.path.isabs(original_path) else original_path
                 
                 # 3. 检查Markdown图片格式 ![Chart](file://...) 或 ![Chart](charts/...)
                 elif re.search(r'!\[.*?\]\((file://)?(.+?\.(png|jpg|jpeg|svg))\)', answer):
@@ -189,8 +203,8 @@ class DBManager:
                         # 获取第一个匹配的路径
                         file_protocol, path_part, ext = markdown_matches[0]
                         original_path = path_part.strip()
-                        # 如果路径不是绝对路径，转换为绝对路径
-                        img_path = os.path.abspath(original_path) if not os.path.isabs(original_path) else original_path
+                        # 转换为相对路径
+                        img_path = os.path.relpath(original_path) if os.path.isabs(original_path) else original_path
                 
                 # 4. 检查是否有图片文件路径行 (单独的路径行)
                 elif re.search(r'charts/\d+_[a-zA-Z0-9]+\.(png|jpg|jpeg|svg)(?:\n|$)', answer):
@@ -213,7 +227,7 @@ class DBManager:
                         for dir_path in possible_dirs:
                             full_path = os.path.join(dir_path, filename)
                             if os.path.exists(full_path):
-                                img_path = os.path.abspath(full_path)
+                                img_path = os.path.relpath(full_path)
                                 break
                 
                 has_chart = has_img and img_path and os.path.exists(img_path)
@@ -259,7 +273,7 @@ class DBManager:
         cursor = conn.cursor()
         
         cursor.execute(
-            "SELECT session_id, session_file, timestamp FROM sessions WHERE client_id=? ORDER BY timestamp DESC",
+            "SELECT id, session_file, created_at FROM sessions WHERE client_id=? ORDER BY created_at DESC",
             (client_id,)
         )
         sessions = cursor.fetchall()
@@ -412,7 +426,7 @@ class DBManager:
         
         try:
             cursor.execute(
-                "INSERT INTO sessions (session_id, session_file, timestamp, client_id) VALUES (?, ?, ?, ?)",
+                "INSERT INTO sessions (id, session_file, created_at, client_id) VALUES (?, ?, ?, ?)",
                 (session_id, session_file, timestamp, client_id)
             )
             conn.commit()
@@ -440,7 +454,7 @@ class DBManager:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        cursor.execute("SELECT session_file FROM sessions WHERE session_id=?", (session_id,))
+        cursor.execute("SELECT session_file FROM sessions WHERE id=?", (session_id,))
         result = cursor.fetchone()
         conn.close()
         
@@ -448,10 +462,13 @@ class DBManager:
             return result[0]
         return None
     
-    def display_all_history(self):
+    def display_all_history(self, language="zh"):
         """
         获取所有聊天历史记录用于显示
         
+        Args:
+            language: 语言代码，'zh'或'en'
+            
         Returns:
             list: 包含所有聊天记录的列表，格式化为显示用的格式
         """
@@ -502,7 +519,7 @@ class DBManager:
                 
             # 处理回答及图表
             answer = row['answer']
-            answer_text = self._format_answer_for_display(answer, row)
+            answer_text = self._format_answer_for_display(answer, row, language)
                 
             # 添加模型标记
             model_info = row['model_name'] if row['model_name'] else row['llm_type']
@@ -513,17 +530,129 @@ class DBManager:
             session_file = row['session_file']
             session_info = f"{session_file} ({session_id[:8]}...)"
             
-            # 移除record_id列，只返回4列数据: 时间, 会话ID, 问题, 回答
+            # 返回6列数据: 时间, 会话ID, 问题, 回答, 点击加载数据, 删除操作
+            # 点击加载数据操作列：只显示用户友好的文本
+            has_chart_flag = 1 if (row['has_chart'] and row['chart_path'] and os.path.exists(row['chart_path'])) else 0
+            load_action_text = LanguageUtils.get_text(language, "load_record_action")
+            # 只显示用户友好的文本，不显示技术标记
+            load_record_action = f"📋 {load_action_text}"
+            
+            # 删除操作列：显示删除按钮
+            delete_action_text = LanguageUtils.get_text(language, "delete_this_record")
+            delete_record_action = f"🗑️ {delete_action_text}"
+                
             result.append([
                 f"{created_at} ({model_info})",  # 时间与模型
                 session_info,                    # 会话ID与文件名
                 question,                        # 问题
-                answer_text                      # 回答
+                answer_text,                     # 回答
+                load_record_action,              # 点击加载数据操作
+                delete_record_action             # 删除操作
             ])
         
         return result
     
-    def _format_answer_for_display(self, answer, row):
+    def search_history_by_question(self, search_keywords, language="zh"):
+        """
+        根据问题内容进行模糊搜索
+        
+        Args:
+            search_keywords: 搜索关键词
+            language: 语言代码，'zh'或'en'
+            
+        Returns:
+            list: 包含匹配记录的列表，格式化为显示用的格式
+        """
+        if not search_keywords or not search_keywords.strip():
+            return []
+            
+        conn = self._connect()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # 使用LIKE进行模糊搜索，支持多个关键词
+        search_pattern = f"%{search_keywords.strip()}%"
+        
+        cursor.execute(
+            '''
+            SELECT 
+                chat_history.id, 
+                chat_history.session_id,
+                chat_history.session_file, 
+                chat_history.question, 
+                chat_history.answer, 
+                chat_history.created_at,
+                chat_history.llm_type,
+                chat_history.model_name,
+                chat_history.has_chart,
+                chat_history.chart_path
+            FROM 
+                chat_history 
+            WHERE 
+                chat_history.question LIKE ?
+            ORDER BY 
+                chat_history.created_at DESC
+            LIMIT 50
+            ''',
+            (search_pattern,)
+        )
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        result = []
+        
+        # 如果没有记录，返回空结果
+        if not rows:
+            return []
+            
+        for row in rows:
+            # 格式化时间 - 只显示日期和时间，不显示秒
+            created_at = row['created_at']
+            if created_at and len(created_at) > 16:
+                created_at = created_at[:16]
+            
+            # 限制问题的长度
+            question = row['question']
+            if len(question) > 50:
+                question = question[:50] + "..."
+                
+            # 处理回答及图表
+            answer = row['answer']
+            answer_text = self._format_answer_for_display(answer, row, language)
+                
+            # 添加模型标记
+            model_info = row['model_name'] if row['model_name'] else row['llm_type']
+            model_info = model_info.replace("gpt-3.5-turbo", "GPT-3.5").replace("gpt-4", "GPT-4")
+            
+            # 添加会话ID和文件名，格式为：session_file (session_id)
+            session_id = row['session_id']
+            session_file = row['session_file']
+            session_info = f"{session_file} ({session_id[:8]}...)"
+            
+            # 返回6列数据: 时间, 会话ID, 问题, 回答, 点击加载数据, 删除操作
+            # 点击加载数据操作列：只显示用户友好的文本
+            has_chart_flag = 1 if (row['has_chart'] and row['chart_path'] and os.path.exists(row['chart_path'])) else 0
+            load_action_text = LanguageUtils.get_text(language, "load_record_action")
+            # 只显示用户友好的文本，不显示技术标记
+            load_record_action = f"📋 {load_action_text}"
+            
+            # 删除操作列：显示删除按钮
+            delete_action_text = LanguageUtils.get_text(language, "delete_this_record")
+            delete_record_action = f"🗑️ {delete_action_text}"
+                
+            result.append([
+                f"{created_at} ({model_info})",  # 时间与模型
+                session_info,                    # 会话ID与文件名
+                question,                        # 问题
+                answer_text,                     # 回答
+                load_record_action,              # 点击加载数据操作
+                delete_record_action             # 删除操作
+            ])
+        
+        return result
+    
+    def _format_answer_for_display(self, answer, row, language="zh"):
         """格式化回答用于显示"""
         # 限制长度为120字符
         MAX_LENGTH = 120
@@ -537,10 +666,11 @@ class DBManager:
         
         # 如果有图表，添加标记
         if row['has_chart'] and row['chart_path'] and os.path.exists(row['chart_path']):
+            chart_tag = LanguageUtils.get_text(language, "chart_tag")
             if len(answer_text) > MAX_LENGTH:
-                answer_text = answer_text[:MAX_LENGTH] + "... [图表]"
+                answer_text = answer_text[:MAX_LENGTH] + f"... {chart_tag}"
             else:
-                answer_text += " [图表]"
+                answer_text += f" {chart_tag}"
         elif len(answer_text) > MAX_LENGTH:
             answer_text = answer_text[:MAX_LENGTH] + "..."
             
@@ -820,4 +950,39 @@ class DBManager:
             return ""
         except Exception as e:
             print(f"通过时间和问题获取记录ID时出错: {str(e)}")
-            return "" 
+            return ""
+    
+    def get_all_referenced_chart_paths(self):
+        """
+        获取数据库中所有被引用的图表路径
+        
+        Returns:
+            set: 包含所有被引用图表路径的集合
+        """
+        try:
+            conn = self._connect()
+            cursor = conn.cursor()
+            
+            # 查询所有有图表的记录
+            cursor.execute('''
+                SELECT DISTINCT chart_path 
+                FROM chat_history 
+                WHERE has_chart = 1 AND chart_path IS NOT NULL AND chart_path != ''
+            ''')
+            
+            results = cursor.fetchall()
+            referenced_charts = set()
+            
+            for result in results:
+                chart_path = result[0]
+                if chart_path:
+                    # 标准化路径
+                    normalized_path = os.path.relpath(chart_path).replace('\\', '/')
+                    referenced_charts.add(normalized_path)
+            
+            conn.close()
+            return referenced_charts
+            
+        except Exception as e:
+            print(f"获取引用图表路径时出错: {e}")
+            return set() 

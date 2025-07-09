@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  pandas-ai-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pandas-ai-web
+    ports:
+      - "${GRADIO_SERVER_PORT:-7860}:7860"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - GRADIO_SERVER_NAME=0.0.0.0
+      - GRADIO_SERVER_PORT=7860
+      - GRADIO_SHARE=${GRADIO_SHARE:-false}
+      # AI模型配置
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY:-}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-}
+      - AZURE_OPENAI_DEPLOYMENT_NAME=${AZURE_OPENAI_DEPLOYMENT_NAME:-}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION:-2023-05-15}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      # 如果ollama在不同地址，可以修改上面的URL，比如：
+      # - OLLAMA_BASE_URL=http://192.168.1.100:11434
+      - DEFAULT_LLM_TYPE=${DEFAULT_LLM_TYPE:-Ollama}
+    volumes:
+      - ./charts:/app/charts
+      - ./exports:/app/exports
+      - ./config:/app/config
+      - ./data:/app/data
+    restart: unless-stopped
+    networks:
+      - pandas-ai-network
+
+networks:
+  pandas-ai-network:
+    driver: bridge 

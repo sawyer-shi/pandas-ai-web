@@ -14,7 +14,7 @@ from .utils.data_loader import DataLoader
 from .utils.chart_analyzer import ChartAnalyzer
 from .utils.oss_uploader import OSSUploader
 from .utils.image_utils import create_image_html
-from .utils.font_config import get_chinese_plot_kwargs
+from .utils.font_config import get_chinese_plot_kwargs, ensure_chinese_font_for_pandasai
 from .database.db_manager import DBManager
 from .config.config_manager import ConfigManager
 from .llm.llm_factory import LLMFactory
@@ -98,11 +98,11 @@ class AppController:
     
     def display_chat_history(self):
         """显示所有的聊天记录历史"""
-        return self.db_manager.display_all_history()
+        return self.db_manager.display_all_history(self.language)
     
     def refresh_current_history(self):
         """刷新当前的历史记录显示"""
-        history_data = self.db_manager.display_all_history()
+        history_data = self.db_manager.display_all_history(self.language)
         
         # 如果没有历史记录，显示提示信息
         if not history_data:
@@ -112,10 +112,43 @@ class AppController:
                 f"{self.get_text('last_updated')} {current_time}", 
                 "-",  # 会话ID列
                 self.get_text('no_history'), 
-                "-"
+                "-",  # 回答列
+                "-",  # 加载操作列
+                "-"   # 删除操作列
             ]]
             
         return history_data
+    
+    def search_history(self, search_keywords):
+        """
+        搜索历史记录
+        
+        Args:
+            search_keywords: 搜索关键词
+            
+        Returns:
+            list: 搜索结果列表
+        """
+        if not search_keywords or not search_keywords.strip():
+            # 如果搜索关键词为空，返回所有历史记录
+            return self.db_manager.display_all_history(self.language)
+        
+        # 执行搜索
+        results = self.db_manager.search_history_by_question(search_keywords, self.language)
+        
+        # 如果没有结果，返回提示信息
+        if not results:
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+            return [[
+                f"{self.get_text('last_updated')} {current_time}", 
+                "-",  # 会话ID列
+                self.get_text('no_search_results'), 
+                "-",  # 回答列
+                "-",  # 加载操作列
+                "-"   # 删除操作列
+            ]]
+        
+        return results
     
     def set_language(self, language):
         """设置界面语言"""
@@ -125,6 +158,72 @@ class AppController:
     def get_text(self, key, *args):
         """获取当前语言的文本"""
         return LanguageUtils.get_text(self.language, key, *args)
+    
+    def _clean_chart_files(self, preserve_referenced=True):
+        """
+        清理图表文件的统一方法
+        
+        Args:
+            preserve_referenced: 是否保留被数据库记录引用的图表文件
+        """
+        try:
+            import glob
+            
+            # 获取所有图表文件
+            chart_files = glob.glob("charts/*.png") + glob.glob("charts/*.jpg") + glob.glob("charts/*.jpeg") + glob.glob("charts/*.svg")
+            export_chart_files = glob.glob("exports/charts/*.png") + glob.glob("exports/charts/*.jpg") + glob.glob("exports/charts/*.jpeg") + glob.glob("exports/charts/*.svg")
+            all_chart_files = chart_files + export_chart_files
+            
+            if not all_chart_files:
+                print("没有找到需要清理的图表文件")
+                return 0
+            
+            # 如果需要保留被引用的图表，先获取数据库中引用的图表路径
+            referenced_charts = set()
+            if preserve_referenced:
+                try:
+                    # 从数据库获取所有被引用的图表路径
+                    referenced_charts = self.db_manager.get_all_referenced_chart_paths()
+                    print(f"数据库中有 {len(referenced_charts)} 个被引用的图表")
+                except Exception as e:
+                    print(f"获取引用图表列表时出错: {e}")
+                    referenced_charts = set()
+            
+            # 清理图表文件
+            cleaned_count = 0
+            preserved_count = 0
+            
+            for chart_file in all_chart_files:
+                # 标准化路径用于比较
+                normalized_path = os.path.relpath(chart_file).replace('\\', '/')
+                
+                # 检查是否被数据库引用
+                is_referenced = False
+                if preserve_referenced:
+                    for ref_path in referenced_charts:
+                        if ref_path and (normalized_path == ref_path or 
+                                       os.path.basename(normalized_path) == os.path.basename(ref_path)):
+                            is_referenced = True
+                            break
+                
+                if is_referenced:
+                    preserved_count += 1
+                    print(f"保留被引用的图表文件: {chart_file}")
+                else:
+                    try:
+                        os.remove(chart_file)
+                        cleaned_count += 1
+                        print(f"清理图表文件: {chart_file}")
+                    except Exception as e:
+                        print(f"删除图表文件失败 {chart_file}: {e}")
+            
+            if cleaned_count > 0 or preserved_count > 0:
+                print(f"图表清理完成: 清理了 {cleaned_count} 个文件，保留了 {preserved_count} 个文件")
+            
+            return cleaned_count
+        except Exception as e:
+            print(f"清理图表文件时出错: {e}")
+            return 0
     
     def load_dataframe(self, file):
         """从上传的文件加载pandas数据框"""
@@ -149,24 +248,12 @@ class AppController:
             self.agent = None  # 清空旧的Agent
             self.chat_history = []  # 重置聊天记录
             
-            # 清理旧的图表缓存（如果有的话）
-            try:
-                # 清理charts目录中过期的图表文件（保留最近1小时的）
-                import glob
-                import time
-                chart_files = glob.glob("charts/*.png")
-                current_time = time.time()
-                for chart_file in chart_files:
-                    file_time = os.path.getmtime(chart_file)
-                    # 如果文件超过1小时，删除它
-                    if current_time - file_time > 3600:  # 3600秒 = 1小时
-                        try:
-                            os.remove(chart_file)
-                            print(f"清理旧图表文件: {chart_file}")
-                        except:
-                            pass
-            except Exception as e:
-                print(f"清理旧图表时出错: {e}")
+            # 强制垃圾回收以确保旧状态被清理
+            import gc
+            gc.collect()
+            
+            # 清理所有旧的图表缓存文件
+            self._clean_chart_files()
             
             # 设置新数据
             self.df = dataframe
@@ -215,6 +302,9 @@ class AppController:
             data_description = self._generate_data_description()
             print(f"📋 数据描述已生成，包含 {len(self.df.columns)} 个列")
             
+            # 确保中文字体配置
+            plot_kwargs = ensure_chinese_font_for_pandasai()
+            
             # 配置PandasAI
             config = {
                 "llm": llm,
@@ -225,7 +315,7 @@ class AppController:
                 "enable_cache": False,  # 禁用缓存以避免列名混淆
                 "custom_head": 5,  # 显示更多行来帮助理解数据
                 # 设置matplotlib字体和样式配置，确保中文正常显示
-                "custom_plot_kwargs": get_chinese_plot_kwargs()
+                "custom_plot_kwargs": plot_kwargs
             }
             
             # 创建全新的Agent实例
@@ -397,14 +487,26 @@ class AppController:
                         "custom_head": current_config.get("custom_head", 5)
                     }
                     
+                    # 确保中文字体配置并获取plot_kwargs
+                    plot_kwargs = ensure_chinese_font_for_pandasai()
+                    
                     # 安全地添加custom_plot_kwargs
                     if "custom_plot_kwargs" in current_config:
-                        config_dict["custom_plot_kwargs"] = current_config["custom_plot_kwargs"]
+                        # 合并现有配置和中文字体配置
+                        existing_kwargs = current_config["custom_plot_kwargs"]
+                        if isinstance(existing_kwargs, dict):
+                            existing_kwargs.update(plot_kwargs)
+                            config_dict["custom_plot_kwargs"] = existing_kwargs
+                        else:
+                            config_dict["custom_plot_kwargs"] = plot_kwargs
                     else:
-                        config_dict["custom_plot_kwargs"] = get_chinese_plot_kwargs()
+                        config_dict["custom_plot_kwargs"] = plot_kwargs
                     
                     # 重新应用配置
                     self.agent._config = config_dict
+                    
+                    # 在调用chat前再次确保字体配置
+                    ensure_chinese_font_for_pandasai()
                     
                     # 使用修改后的问题调用Agent的chat方法
                     result = self.agent.chat(modified_question)
@@ -425,6 +527,9 @@ class AppController:
                     
                     print(f"🔤 语言检测: {'中文' if is_chinese else '英文'}")
                     print(f"🔤 修改后问题: {modified_question}")
+                    
+                    # 确保中文字体配置
+                    ensure_chinese_font_for_pandasai()
                     
                     # 直接使用chat方法
                     result = self.agent.chat(modified_question)
@@ -627,6 +732,8 @@ class AppController:
     
     def clear_chat(self, chatbot):
         """清空当前聊天界面和图表显示"""
+        # 清理当前会话的图表文件（不保留引用，因为用户要求清空）
+        self._clean_chart_files(preserve_referenced=False)
         return [], None, self.get_text("no_chart")
     
     def delete_session_history(self, session_id):
@@ -791,13 +898,14 @@ class AppController:
             print(f"根据详情获取会话ID时出错: {str(e)}")
             return ""
         
-    def load_history_record(self, session_id, chatbot):
+    def load_history_record(self, session_id, chatbot, specific_record_id=None):
         """
         从历史记录中加载选中的会话记录到当前对话框
         
         Args:
             session_id: 选中的会话ID
             chatbot: 当前的对话框内容
+            specific_record_id: 可选，指定要显示图表的记录ID
             
         Returns:
             tuple: 更新后的对话框内容、状态消息、图表文件路径、图表信息
@@ -835,12 +943,28 @@ class AppController:
             
             print(f"加载了 {len(history)} 条聊天记录")
             
-            # 查找最新的图表文件
-            latest_chart_file = None
-            latest_chart_info = self.get_text("no_chart")
+            # 查找要显示的图表文件
+            target_chart_file = None
+            target_chart_info = self.get_text("no_chart")
+            
+            # 如果指定了特定记录ID，先尝试加载该记录的图表
+            if specific_record_id:
+                try:
+                    chart_file, chart_info, status = self.load_chart_by_record_id(specific_record_id)
+                    if chart_file:
+                        target_chart_file = chart_file
+                        target_chart_info = chart_info
+                        print(f"✅ 成功加载指定记录 {specific_record_id} 的图表: {chart_file}")
+                    else:
+                        print(f"❌ 指定记录 {specific_record_id} 没有图表或图表不存在")
+                except Exception as e:
+                    print(f"❌ 加载指定记录图表失败: {str(e)}")
             
             # 转换为Gradio Chatbot新的messages格式
             chatbot_messages = []
+            fallback_chart_file = None
+            fallback_chart_info = self.get_text("no_chart")
+            
             for i, msg in enumerate(history):
                 # 添加用户消息
                 chatbot_messages.append({"role": "user", "content": msg["question"]})
@@ -854,19 +978,21 @@ class AppController:
                 if msg.get('has_chart') and msg.get('chart_path'):
                     chart_path = msg['chart_path']
                     print(f"检查图表路径: {chart_path}")
-                    print(f"路径是否存在: {os.path.exists(chart_path)}")
                     
-                    if os.path.exists(chart_path):
-                        # 更新最新的图表信息（覆盖之前的，确保显示最新的）
-                        # 确保使用绝对路径
-                        latest_chart_file = os.path.abspath(chart_path)
-                        absolute_path = latest_chart_file
-                        
-                        latest_chart_info = f"""{self.get_text('chart_file')}: {os.path.basename(latest_chart_file)}
+                    # 使用新的路径解析方法
+                    resolved_chart_path = self._resolve_chart_path(chart_path)
+                    
+                    if resolved_chart_path:
+                        # 如果还没有目标图表，或者没有指定特定记录ID，则更新备用图表信息
+                        if not target_chart_file:
+                            fallback_chart_file = resolved_chart_path
+                            absolute_path = fallback_chart_file
+                            
+                            fallback_chart_info = f"""{self.get_text('chart_file')}: {os.path.basename(fallback_chart_file)}
 {self.get_text('loading_time')}: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 {self.get_text('chart_path')}: {absolute_path}"""
-                        
-                        print(f"更新图表信息: 文件={latest_chart_file}, 绝对路径={absolute_path}")
+                            
+                            print(f"更新备用图表信息: 文件={fallback_chart_file}, 绝对路径={absolute_path}")
                         
                         # 分离文本和图片路径
                         text_content = answer_content
@@ -896,79 +1022,21 @@ class AppController:
                         content = f"{text_content}\n\n✅ {self.get_text('chart_loaded_view_right')}"
                         chatbot_messages.append({"role": "assistant", "content": content})
                     else:
-                        print(f"图表文件不存在: {chart_path}")
-                        
-                        # 尝试在其他可能的位置查找图表
-                        possible_paths = []
-                        chart_filename = os.path.basename(chart_path)
-                        
-                        # 如果原路径是exports/charts，尝试charts目录
-                        if chart_path.startswith('exports/charts/'):
-                            possible_paths.append(os.path.join('charts', chart_filename))
-                        # 如果原路径是charts，尝试exports/charts目录
-                        elif chart_path.startswith('charts/'):
-                            possible_paths.append(os.path.join('exports/charts', chart_filename))
-                        
-                        # 尝试其他可能的路径
-                        possible_paths.extend([
-                            os.path.join('charts', chart_filename),
-                            os.path.join('exports/charts', chart_filename),
-                            chart_filename  # 当前目录
-                        ])
-                        
-                        found_chart = None
-                        for possible_path in possible_paths:
-                            if os.path.exists(possible_path):
-                                found_chart = possible_path
-                                print(f"✅ 在备用位置找到图表: {found_chart}")
-                                break
-                        
-                        if found_chart:
-                            # 使用找到的图表
-                            latest_chart_file = os.path.abspath(found_chart)
-                            absolute_path = latest_chart_file
-                            
-                            latest_chart_info = f"""{self.get_text('chart_file')}: {os.path.basename(latest_chart_file)}
-{self.get_text('loading_time')}: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-{self.get_text('chart_path')}: {absolute_path}"""
-                            
-                            print(f"使用备用图表: 文件={latest_chart_file}")
-                            
-                            # 处理回答内容
-                            text_content = answer_content
-                            import re
-                            chart_patterns = [
-                                r'本地图片路径:\s*[^\n]+',
-                                r'file://[^\n]+',
-                                r'<img[^>]*>',
-                                r'<br><small>图片路径:[^<]*</small>',
-                                r'!\[.*?\]\([^)]+\)',
-                                r'[A-Za-z]:\\[^<>:|?*\n]+\.(png|jpg|jpeg|svg)',
-                                r'/[^<>:|?*\n]+\.(png|jpg|jpeg|svg)',
-                                r'exports/charts/[^<>:|?*\n]+\.(png|jpg|jpeg|svg)',
-                                r'charts/[^<>:|?*\n]+\.(png|jpg|jpeg|svg)'
-                            ]
-                            
-                            for pattern in chart_patterns:
-                                text_content = re.sub(pattern, '', text_content)
-                            
-                            text_content = re.sub(r'(<br>\s*){3,}', '<br><br>', text_content)
-                            text_content = re.sub(r'\n{3,}', '\n\n', text_content).strip()
-                            
-                            content = f"{text_content}\n\n✅ {self.get_text('chart_loaded_view_right')}"
-                            chatbot_messages.append({"role": "assistant", "content": content})
-                        else:
-                            print(f"❌ 在所有位置都找不到图表文件")
-                            # 纯文本回复
-                            chatbot_messages.append({"role": "assistant", "content": answer_content})
+                        print(f"❌ 未找到图表文件: {chart_path}")
+                        # 纯文本回复
+                        chatbot_messages.append({"role": "assistant", "content": answer_content})
                 else:
                     print(f"无图表信息: has_chart={msg.get('has_chart')}, chart_path={msg.get('chart_path')}")
                     # 纯文本回复
                     chatbot_messages.append({"role": "assistant", "content": answer_content})
             
-            print(f"最终图表信息: latest_chart_file={latest_chart_file}, latest_chart_info={latest_chart_info}")
+            # 决定最终显示的图表：优先使用目标图表，否则使用备用图表
+            final_chart_file = target_chart_file if target_chart_file else fallback_chart_file
+            final_chart_info = target_chart_info if target_chart_file else fallback_chart_info
             
-            return chatbot_messages, f"{self.get_text('session_loaded_from_history')}: {self.session_file}", latest_chart_file, latest_chart_info
+            print(f"最终图表信息: final_chart_file={final_chart_file}, final_chart_info={final_chart_info}")
+            
+            return chatbot_messages, f"{self.get_text('session_loaded_from_history')}: {self.session_file}", final_chart_file, final_chart_info
         except Exception as e:
             print(f"加载会话记录时出错: {str(e)}")
             return chatbot, f"加载会话记录失败: {str(e)}", None, f"加载错误: {str(e)}"
@@ -1016,4 +1084,153 @@ class AppController:
             return self.db_manager.get_session_id_by_record_id(record_id)
         except Exception as e:
             print(f"通过记录ID获取会话ID时出错: {str(e)}")
-            return "" 
+            return ""
+    
+    def get_record_by_time_question(self, time_question_info):
+        """
+        通过时间和问题信息获取记录详细信息
+        
+        Args:
+            time_question_info: 格式为"时间信息|问题信息"的字符串
+            
+        Returns:
+            dict: 包含session_id, record_id, has_chart等信息的字典
+        """
+        try:
+            # 首先获取record_id
+            record_id = self.db_manager.get_record_by_time_and_question(time_question_info)
+            
+            if not record_id:
+                return None
+            
+            # 获取记录的详细信息
+            conn = self.db_manager._connect()
+            cursor = conn.cursor()
+            
+            cursor.execute(
+                '''
+                SELECT 
+                    session_id,
+                    has_chart,
+                    chart_path
+                FROM 
+                    chat_history 
+                WHERE 
+                    id = ?
+                ''',
+                (record_id,)
+            )
+            
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                return {
+                    'session_id': result[0],
+                    'record_id': record_id,
+                    'has_chart': result[1],
+                    'chart_path': result[2]
+                }
+            return None
+            
+        except Exception as e:
+            print(f"通过时间和问题获取记录信息时出错: {str(e)}")
+            return None
+    
+    def _resolve_chart_path(self, chart_path):
+        """
+        解析图表文件路径，尝试在多个可能的位置查找文件
+        
+        Args:
+            chart_path: 原始图表路径
+            
+        Returns:
+            str: 找到的图表文件的绝对路径，如果未找到则返回None
+        """
+        if not chart_path:
+            return None
+            
+        # 如果路径直接存在，返回绝对路径
+        if os.path.exists(chart_path):
+            return os.path.abspath(chart_path)
+        
+        # 提取文件名
+        chart_filename = os.path.basename(chart_path)
+        
+        # 尝试在多个可能的位置查找
+        possible_paths = [
+            chart_path,  # 原始路径
+            os.path.join('charts', chart_filename),  # charts目录
+            os.path.join('exports/charts', chart_filename),  # exports/charts目录
+            chart_filename,  # 当前目录
+        ]
+        
+        # 如果原路径包含目录，也尝试相对路径
+        if '/' in chart_path or '\\' in chart_path:
+            # 如果是exports/charts路径，尝试charts目录
+            if 'exports/charts' in chart_path:
+                possible_paths.append(chart_path.replace('exports/charts', 'charts'))
+            # 如果是charts路径，尝试exports/charts目录
+            elif 'charts' in chart_path:
+                possible_paths.append(chart_path.replace('charts', 'exports/charts'))
+        
+        # 逐一尝试路径
+        for possible_path in possible_paths:
+            if os.path.exists(possible_path):
+                print(f"✅ 在位置找到图表文件: {possible_path}")
+                return os.path.abspath(possible_path)
+        
+        print(f"❌ 未找到图表文件: {chart_path}, 尝试了 {len(possible_paths)} 个位置")
+        return None
+    
+    def load_chart_by_record_id(self, record_id):
+        """
+        根据记录ID加载对应的图表
+        
+        Args:
+            record_id: 聊天记录ID
+            
+        Returns:
+            tuple: (图表文件路径, 图表信息文本, 状态消息)
+        """
+        try:
+            if not record_id:
+                return None, self.get_text("no_chart"), "未指定记录ID"
+            
+            # 从数据库获取记录信息
+            conn = self.db_manager._connect()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT has_chart, chart_path, question, answer, created_at
+                FROM chat_history 
+                WHERE id = ?
+            ''', (record_id,))
+            
+            record = cursor.fetchone()
+            conn.close()
+            
+            if not record:
+                return None, self.get_text("no_chart"), "未找到指定记录"
+            
+            has_chart, chart_path, question, answer, created_at = record
+            
+            if not has_chart or not chart_path:
+                return None, self.get_text("no_chart"), "该记录不包含图表"
+            
+            # 使用路径解析方法查找图表文件
+            resolved_chart_path = self._resolve_chart_path(chart_path)
+            
+            if not resolved_chart_path:
+                return None, self.get_text("no_chart"), f"图表文件不存在: {chart_path}"
+            
+            # 生成图表信息
+            chart_filename = os.path.basename(resolved_chart_path)
+            chart_info = f"图表文件: {chart_filename}\n加载时间: {created_at}\n路径: {resolved_chart_path}"
+            
+            print(f"✅ 成功加载图表: {resolved_chart_path}")
+            return resolved_chart_path, chart_info, "图表加载成功"
+            
+        except Exception as e:
+            print(f"加载图表时出错: {e}")
+            return None, self.get_text("no_chart"), f"加载图表失败: {str(e)}" 

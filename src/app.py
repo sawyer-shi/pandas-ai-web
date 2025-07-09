@@ -41,8 +41,24 @@ def main():
     # 创建Gradio界面
     interface = app_ui.create_interface()
     
+    # 从环境变量读取配置参数
+    server_name = os.getenv("GRADIO_SERVER_NAME", "127.0.0.1")
+    server_port = int(os.getenv("GRADIO_SERVER_PORT", "7860"))
+    share = os.getenv("GRADIO_SHARE", "true").lower() == "true"
+    
+    print(f"正在启动服务器...")
+    print(f"服务器地址: http://{server_name}:{server_port}")
+    if share:
+        print("将创建公共分享链接...")
+    else:
+        print("仅在本地访问")
+    
     # 启动应用
-    interface.launch(share=True)  # 设置share=True创建公共链接
+    interface.launch(
+        server_name=server_name,
+        server_port=server_port,
+        share=share
+    )
 
 if __name__ == "__main__":
     main() 
